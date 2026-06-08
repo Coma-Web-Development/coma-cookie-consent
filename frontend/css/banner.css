@@ -3,25 +3,17 @@
 	--ccc-accent:       #0094C8;
 	--ccc-accent-dark:  #0079a8;
 	--ccc-accent-2:     var(--ccc-accent);
-	--ccc-bg:           #1c1c1c;
-	--ccc-text:         #ffffff;
-	--ccc-muted:        #aaaaaa;
-	--ccc-border:       rgba(255,255,255,0.12);
-	--ccc-row-alt:      #252525;
-	--ccc-th-bg:        #2a2a2a;
+	/* Default theme: light background, dark text. Override per-site via the
+	   colour settings (PHP injects a custom palette when Background is set). */
+	--ccc-bg:           #f4f4f4;
+	--ccc-text:         #2c2c2c;
+	--ccc-muted:        #868686;
+	--ccc-border:       rgba(44,44,44,0.16);
+	--ccc-row-alt:      #e6e6e6;
+	--ccc-th-bg:        #e2e2e2;
 	--ccc-radius:       8px;
 	--ccc-radius-lg:    12px;
 	--ccc-z:            9999999;
-}
-
-/* ── Modal: light theme override ─────────────────────────────────────────── */
-#ccc-modal {
-	--ccc-bg:      #F5F6F8;
-	--ccc-text:    #1A1D26;
-	--ccc-muted:   #6B7490;
-	--ccc-border:  #E2E4EC;
-	--ccc-row-alt: #ECEEF3;
-	--ccc-th-bg:   #ECEEF3;
 }
 
 /* Ensure hidden attribute always wins over our display overrides */

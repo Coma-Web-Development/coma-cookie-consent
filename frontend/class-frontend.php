@@ -333,7 +333,13 @@ gtag('config', '<?php echo esc_js( $id ); ?>');
 		$t           = $this->t;
 		$title       = esc_html( $this->content( 'banner_title' ) );
 		$desc        = esc_html( $this->content( 'banner_description' ) );
-		$privacy_url = esc_url( $this->content( 'privacy_page_url' ) );
+		$privacy = $this->content( 'privacy_page_url' );
+		if ( '' === trim( $privacy ) ) {
+			// Fall back to WordPress' native Privacy Policy page (WPML/Polylang
+			// return the URL for the current language automatically).
+			$privacy = get_privacy_policy_url();
+		}
+		$privacy_url = esc_url( $privacy );
 		$position    = in_array( $o['banner_position'] ?? 'bottom', array( 'bottom', 'top' ), true ) ? $o['banner_position'] : 'bottom';
 		$analytics   = ! empty( $o['enable_analytics'] );
 		$marketing   = ! empty( $o['enable_marketing'] );

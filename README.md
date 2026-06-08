@@ -3,7 +3,7 @@
 GDPR-compliant cookie consent banner for WordPress with **Google Consent Mode v2**.
 Multilingual (Latvian / Russian / English), auto-detecting the visitor's language.
 
-- **Version:** 1.5.0
+- **Version:** 1.6.0
 - **Author:** [Coma](https://coma.lv)
 
 ## Features
@@ -14,7 +14,7 @@ Multilingual (Latvian / Russian / English), auto-detecting the visitor's languag
   (GA, Facebook, Google Ads, TikTok, LinkedIn, reCAPTCHA, WooCommerce, Sourcebuster).
 - **Open Cookie Database** fallback — classifies ~2,200 additional third-party cookies.
 - **Multilingual** chrome and content in LV / RU / EN.
-- Configurable colour palette (accent, accent 2, background, text) — inherits site fonts.
+- Configurable colour palette (accent, accent 2, background, text) — **light by default**, inherits site fonts.
 - Floating "revisit" button to reopen preferences.
 - Optional consent-aware `gtag.js` loader (off by default).
 - **Tracker blocking** — holds non-Google trackers until consent.
@@ -81,7 +81,10 @@ Only `lv`, `ru`, `en` are supported; anything unsupported falls back to the defa
 
 - Default/fallback language, banner position, accent color, category toggles, revisit button.
 - Google Analytics Measurement ID + optional "load GA from this plugin" toggle.
-- Per-language banner title, description, and privacy-policy URL (blank = built-in default).
+- Per-language banner title, description, and privacy-policy URL.
+  - **Privacy URL auto-detects:** if left blank, the banner uses WordPress' native
+    **Privacy Policy page** (Settings → Privacy), localized per language via WPML/Polylang.
+- Colours: background/text **default to a light theme**; set Background to apply a custom palette.
 
 > **GA note:** The Consent Mode signal is always sent. Only enable *"Load GA from this
 > plugin"* if GA/GTM isn't already loaded elsewhere, or you'll load it twice.
