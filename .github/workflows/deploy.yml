@@ -1,0 +1,30 @@
+name: Deploy plugin
+
+# Deploys the plugin to the live sites when a GitHub Release is published.
+# Uses a locked-down deploy key (forced command on the server) — it can only
+# run the deploy script, nothing else.
+on:
+  release:
+    types: [published]
+  workflow_dispatch: {}   # allow manual runs from the Actions tab
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Package plugin
+        run: |
+          mkdir -p build/coma-cookie-consent
+          rsync -a --exclude='.git' --exclude='.github' --exclude='build' ./ build/coma-cookie-consent/
+
+      - name: Deploy over SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -t ed25519 65.21.223.192 >> ~/.ssh/known_hosts 2>/dev/null
+          tar czf - -C build coma-cookie-consent | ssh -i ~/.ssh/deploy_key root@65.21.223.192
