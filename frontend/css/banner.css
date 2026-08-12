@@ -197,13 +197,15 @@
 	background: transparent !important;
 	background-color: transparent !important;
 	color: var(--ccc-text) !important;
-	border: 2px solid rgba(255,255,255,0.35) !important;
+	border: 2px solid rgba(44,44,44,0.35) !important; /* fallback for no color-mix */
+	border: 2px solid color-mix(in srgb, currentColor 40%, transparent) !important;
 }
 #ccc-banner .ccc-btn--outline:hover,
 #ccc-banner .ccc-btn--outline:focus,
 #ccc-modal .ccc-btn--outline:hover,
 #ccc-modal .ccc-btn--outline:focus {
-	border-color: rgba(255,255,255,0.7) !important;
+	border-color: rgba(44,44,44,0.7) !important; /* fallback for no color-mix */
+	border-color: color-mix(in srgb, currentColor 75%, transparent) !important;
 	background: transparent !important;
 	background-color: transparent !important;
 	color: var(--ccc-text) !important;
