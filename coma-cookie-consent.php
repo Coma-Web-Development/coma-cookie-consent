@@ -3,7 +3,7 @@
  * Plugin Name: Coma Cookie Consent
  * Plugin URI:  https://coma.lv
  * Description: GDPR-compliant cookie consent banner with Google Consent Mode v2. Multilingual (LV / RU / EN), auto-detects the active language.
- * Version:     1.6.2
+ * Version:     1.6.3
  * Author:      Coma
  * Author URI:  https://coma.lv
  * License:     GPL-2.0+
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'CCC_VERSION',    '1.6.2' );
+define( 'CCC_VERSION',    '1.6.3' );
 define( 'CCC_DB_VERSION', '1' ); // bump when the consent-log schema changes
 define( 'CCC_PATH',    plugin_dir_path( __FILE__ ) );
 define( 'CCC_URL',     plugin_dir_url( __FILE__ ) );

@@ -370,7 +370,7 @@ gtag('config', '<?php echo esc_js( $id ); ?>');
 		<div class="ccc-banner__content">
 			<div class="ccc-banner__text">
 				<span class="ccc-banner__title"><?php echo $title; ?></span>
-				<span class="ccc-banner__desc"><?php echo $desc; ?><?php if ( $privacy_url ) : ?> <a href="<?php echo $privacy_url; ?>" target="_blank" rel="noopener"><?php echo esc_html( $t['learn_more'] ); ?></a><?php endif; ?></span>
+				<span class="ccc-banner__desc"><?php echo $desc; ?></span><?php if ( $privacy_url ) : ?> <a class="ccc-banner__more" href="<?php echo $privacy_url; ?>" target="_blank" rel="noopener"><?php echo esc_html( $t['learn_more'] ); ?></a><?php endif; ?>
 			</div>
 		</div>
 		<div class="ccc-banner__actions">
