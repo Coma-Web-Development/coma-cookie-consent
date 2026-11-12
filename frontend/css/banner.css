@@ -144,15 +144,7 @@
 	color: var(--ccc-muted) !important;
 	margin: 0 !important;
 	line-height: 1.5 !important;
-	display: inline !important;
-}
-
-/* "Learn more" is a sibling of the description (not inside it) so the phone
-   layout can clamp the text without hiding the privacy link. */
-#ccc-banner .ccc-banner__more {
-	font-size: 13px !important;
-	line-height: 1.5 !important;
-	white-space: nowrap !important;
+	display: block !important;
 }
 
 .ccc-banner__actions {
@@ -542,57 +534,17 @@ html body #ccc-modal button.ccc-cat__expander:visited {
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 700px) {
-	/* Compact phone banner: title + privacy link on one row, description
-	   clamped to two lines, all three actions on one row. Was ~190px tall on
-	   a 390px-wide phone (29% of the screen); this is ~125px. */
-	#ccc-banner {
-		padding: 10px 0 calc(10px + env(safe-area-inset-bottom, 0px)) !important;
-	}
 	.ccc-banner__inner {
 		flex-direction: column !important;
 		align-items: stretch !important;
-		gap: 8px !important;
-		padding: 0 14px !important;
-	}
-	.ccc-banner__text {
-		display: grid !important;
-		grid-template-columns: minmax(0, 1fr) auto !important;
-		column-gap: 12px !important;
-		row-gap: 2px !important;
-		align-items: baseline !important;
-	}
-	.ccc-banner__title {
-		font-size: 13px !important;
-		margin: 0 !important;
-		grid-column: 1 !important;
-		grid-row: 1 !important;
-	}
-	#ccc-banner .ccc-banner__more {
-		font-size: 12px !important;
-		grid-column: 2 !important;
-		grid-row: 1 !important;
-	}
-	.ccc-banner__desc {
-		grid-column: 1 / -1 !important;
-		grid-row: 2 !important;
-		font-size: 12px !important;
-		line-height: 1.4 !important;
-		display: -webkit-box !important;
-		-webkit-box-orient: vertical !important;
-		-webkit-line-clamp: 2 !important;
-		overflow: hidden !important;
+		gap: 14px !important;
 	}
 	.ccc-banner__actions {
-		flex-wrap: nowrap !important;
+		flex-wrap: wrap !important;
 		gap: 8px !important;
 	}
-	#ccc-banner .ccc-btn {
-		flex: 1 1 0 !important;
-		justify-content: center !important;
-		min-height: 40px !important;
-		padding: 8px 10px !important;
-	}
-	#ccc-banner .ccc-btn--ghost { flex: 0 0 auto !important; padding: 8px 4px !important; }
+	#ccc-banner .ccc-btn { flex: 1 1 auto !important; justify-content: center !important; }
+	#ccc-banner .ccc-btn--ghost { flex: none !important; }
 
 	.ccc-modal__footer {
 		flex-direction: column !important;

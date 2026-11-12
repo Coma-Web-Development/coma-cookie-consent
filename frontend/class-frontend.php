@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class CCC_Frontend {
 
 	private $options;
-	private $lang;     // resolved language slug: lv | ru | en
+	private $lang;     // resolved language slug: lv | ru | en | lt | et
 	private $t;        // chrome strings for the resolved language
 	private $gated;    // is THIS visitor subject to consent gating (banner + blocking)?
 
@@ -26,7 +26,7 @@ class CCC_Frontend {
 			add_action( 'wp_enqueue_scripts', array( $this, 'enqueue' ) );
 			add_action( 'wp_footer',          array( $this, 'render_banner' ), 1 );
 			add_action( 'wp_footer',          array( $this, 'inject_override_styles' ), 99 );
-			if ( ! empty( $this->options['block_trackers'] ) ) {
+			if ( ! empty( $this->options['block_trackers'] ) || ! empty( $this->options['youtube_nocookie'] ) ) {
 				add_action( 'template_redirect', array( $this, 'start_blocking' ), 0 );
 			}
 		}
@@ -69,9 +69,13 @@ class CCC_Frontend {
 	 * Resolve the visitor's current language to a supported slug.
 	 *
 	 * Order:
-	 *   1. Polylang current language (per-request)
-	 *   2. WPML current language   (per-request)
+	 *   1. Polylang current language (per-request) — its locale first, then its slug
+	 *   2. WPML current language   (per-request) — its locale first, then its code
 	 *   3. Configured default language
+	 *
+	 * The multilingual plugin's *locale* is checked before its code because the
+	 * code is an arbitrary admin-chosen slug (e.g. a site cloned from a Latvian
+	 * install may keep code "lv" for its Estonian language, locale et_EE).
 	 *
 	 * The WP site locale is deliberately NOT used: many single-language sites run
 	 * an English admin locale (en_US) while serving localized content, so trusting
@@ -81,14 +85,18 @@ class CCC_Frontend {
 	 */
 	private function detect_lang() {
 		if ( function_exists( 'pll_current_language' ) ) {
-			$match = $this->match_supported( (string) pll_current_language( 'slug' ) );
+			$match = $this->match_supported( (string) pll_current_language( 'locale' ) )
+				?: $this->match_supported( (string) pll_current_language( 'slug' ) );
 			if ( $match ) {
 				return $match;
 			}
 		}
 
 		if ( defined( 'ICL_LANGUAGE_CODE' ) && ICL_LANGUAGE_CODE ) {
-			$match = $this->match_supported( (string) ICL_LANGUAGE_CODE );
+			$wpml_langs = apply_filters( 'wpml_active_languages', null, 'skip_missing=0' );
+			$locale     = is_array( $wpml_langs ) ? ( $wpml_langs[ ICL_LANGUAGE_CODE ]['default_locale'] ?? '' ) : '';
+			$match      = $this->match_supported( (string) $locale )
+				?: $this->match_supported( (string) ICL_LANGUAGE_CODE );
 			if ( $match ) {
 				return $match;
 			}
@@ -131,6 +139,7 @@ class CCC_Frontend {
 			'lang'            => $this->lang,
 			'ocdUrl'          => CCC_URL . 'frontend/data/open-cookie-db.json?ver=' . CCC_VERSION,
 			'revisitButton'   => ! empty( $this->options['revisit_button'] ),
+			'alignSelector'   => (string) ( $this->options['align_selector'] ?? '' ),
 			'enableAnalytics' => ! empty( $this->options['enable_analytics'] ),
 			'enableMarketing' => ! empty( $this->options['enable_marketing'] ),
 			'activeFeatures'  => $this->get_active_features(),
@@ -150,6 +159,8 @@ class CCC_Frontend {
 			'lv' => 'Neklasificēta sīkdatne',
 			'ru' => 'Неклассифицированный файл cookie',
 			'en' => 'Unclassified cookie',
+			'lt' => 'Neklasifikuotas slapukas',
+			'et' => 'Klassifitseerimata küpsis',
 		);
 		return $m[ $this->lang ] ?? $m['en'];
 	}
@@ -159,6 +170,8 @@ class CCC_Frontend {
 			'lv' => 'Nav atklātu sīkdatņu',
 			'ru' => 'Файлы cookie не обнаружены',
 			'en' => 'No cookies detected',
+			'lt' => 'Slapukų neaptikta',
+			'et' => 'Küpsiseid ei tuvastatud',
 		);
 		return $m[ $this->lang ] ?? $m['en'];
 	}
@@ -248,8 +261,13 @@ gtag('config', '<?php echo esc_js( $id ); ?>');
 	 * Hold known NON-Google tracker scripts until consent: rewrite their <script>
 	 * tags to type="text/plain" (with src moved to data-ccc-src) so the browser
 	 * neither fetches nor executes them. consent.js re-activates the matching
-	 * category once the visitor opts in. Google tags are intentionally NOT blocked —
-	 * Consent Mode v2 governs those.
+	 * category once the visitor opts in. Google tags are NOT blocked by default —
+	 * Consent Mode v2 governs those — unless "block_google" is on, which also holds
+	 * GTM / gtag.js / analytics.js. Use it when the GTM container fires non-Google
+	 * tags without consent checks (Consent Mode cannot stop those).
+	 *
+	 * A category may be compound ("analytics+marketing"): the script then runs only
+	 * once every listed category is granted.
 	 *
 	 * Defensive by design: only matched tracker tags are altered; on anything
 	 * unexpected the original HTML is returned unchanged.
@@ -278,12 +296,51 @@ gtag('config', '<?php echo esc_js( $id ); ?>');
 			array( 're' => 'static\.hotjar\.com|\bhj\s*\(',                                'cat' => 'analytics' ),
 			array( 're' => 'clarity\.ms',                                                  'cat' => 'analytics' ),
 			array( 're' => 'mc\.yandex\.(ru|com)|ym\s*\(',                                 'cat' => 'analytics' ),
+			// WooCommerce order attribution (Sourcebuster sbjs_* cookies)
+			array( 're' => 'sourcebuster|order-attribution',                             'cat' => 'marketing' ),
 		);
+
+		if ( ! empty( $this->options['block_google'] ) ) {
+			// GTM may fire any tag (incl. non-Google pixels), so by default it needs
+			// both categories. Narrow it with the filter if the container is gated inside.
+			$sigs[] = array( 're' => 'googletagmanager\.com/gtm\.js',                  'cat' => apply_filters( 'ccc_gtm_category', 'analytics+marketing' ) );
+			// Google Ads / Floodlight loaders and inline calls (gtag('config','AW-…'), send_to:'AW-…').
+			$sigs[] = array( 're' => 'googleadservices\.com|googletagmanager\.com/gtag/js\?id=(AW|DC)-|[\'"](AW|DC)-\d+', 'cat' => 'marketing' );
+			$sigs[] = array( 're' => 'googletagmanager\.com/gtag/js|google-analytics\.com/(analytics|ga)\.js', 'cat' => 'analytics' );
+		}
+
 		return apply_filters( 'ccc_block_signatures', $sigs );
 	}
 
+	/** Iframe signature list: regex (matched against the whole <iframe> tag) → category. */
+	private function iframe_signatures() {
+		$sigs = array(
+			array( 're' => 'draugiem\.lv/(say|api)',                  'cat' => 'marketing' ),
+			array( 're' => 'facebook\.com/plugins/',                   'cat' => 'marketing' ),
+		);
+		if ( ! empty( $this->options['block_google'] ) ) {
+			$sigs[] = array( 're' => 'googletagmanager\.com/ns\.html', 'cat' => 'analytics+marketing' );
+		}
+		return apply_filters( 'ccc_block_iframe_signatures', $sigs );
+	}
+
 	public function filter_output( $html ) {
-		if ( ! is_string( $html ) || '' === $html || false === stripos( $html, '<script' ) || false === stripos( $html, '<html' ) ) {
+		if ( ! is_string( $html ) || '' === $html || false === stripos( $html, '<html' ) ) {
+			return $html;
+		}
+
+		if ( ! empty( $this->options['youtube_nocookie'] ) ) {
+			$yt = preg_replace( '#(<iframe\b[^>]*\bsrc=["\']?(?:https?:)?//)(?:www\.)?youtube\.com/embed/#i', '$1www.youtube-nocookie.com/embed/', $html );
+			$html = ( null === $yt ) ? $html : $yt;
+		}
+
+		if ( empty( $this->options['block_trackers'] ) ) {
+			return $html;
+		}
+
+		$html = $this->block_iframes( $html );
+
+		if ( false === stripos( $html, '<script' ) ) {
 			return $html;
 		}
 
@@ -297,9 +354,10 @@ gtag('config', '<?php echo esc_js( $id ); ?>');
 				if ( false !== stripos( $m[1], 'data-ccc-block' ) ) {
 					return $whole;
 				}
-				$cat = '';
+				$cat   = '';
+				$probe = str_replace( '\\/', '/', $whole ); // also match JS/JSON-escaped URLs (https:\/\/…)
 				foreach ( $sigs as $sig ) {
-					if ( preg_match( '#' . $sig['re'] . '#i', $whole ) ) {
+					if ( preg_match( '#' . $sig['re'] . '#i', $probe ) ) {
 						$cat = $sig['cat'];
 						break;
 					}
@@ -310,7 +368,7 @@ gtag('config', '<?php echo esc_js( $id ); ?>');
 				$attrs = $m[1];
 				$attrs = preg_replace( '#\bsrc\s*=#i', 'data-ccc-src=', $attrs );          // stop the fetch
 				$attrs = preg_replace( '#\btype\s*=\s*("[^"]*"|\'[^\']*\'|\S+)#i', '', $attrs ); // drop existing type
-				return '<script type="text/plain" data-ccc-block="' . $cat . '"' . $attrs . '>' . $m[2] . '</script>';
+				return '<script type="text/plain" data-ccc-block="' . esc_attr( $cat ) . '"' . $attrs . '>' . $m[2] . '</script>';
 			},
 			$html
 		);
@@ -319,9 +377,38 @@ gtag('config', '<?php echo esc_js( $id ); ?>');
 		return ( null === $out ) ? $html : $out;
 	}
 
-	/** Resolve a per-language content field with graceful fallback to English then any. */
+	/** Hold matched third-party iframes (src → data-ccc-src) until their category is granted. */
+	private function block_iframes( $html ) {
+		if ( false === stripos( $html, '<iframe' ) ) {
+			return $html;
+		}
+		$sigs = $this->iframe_signatures();
+		$out  = preg_replace_callback(
+			'#<iframe\b([^>]*)>#i',
+			function ( $m ) use ( $sigs ) {
+				if ( false !== stripos( $m[1], 'data-ccc-block' ) ) {
+					return $m[0];
+				}
+				foreach ( $sigs as $sig ) {
+					if ( preg_match( '#' . $sig['re'] . '#i', $m[0] ) ) {
+						$attrs = preg_replace( '#\bsrc\s*=#i', 'data-ccc-src=', $m[1] );
+						return '<iframe data-ccc-block="' . esc_attr( $sig['cat'] ) . '"' . $attrs . '>';
+					}
+				}
+				return $m[0];
+			},
+			$html
+		);
+		return ( null === $out ) ? $html : $out;
+	}
+
+	/** Resolve a per-language content field: saved value, then the built-in default for the language, then English. */
 	private function content( $base ) {
 		$val = $this->options[ "{$base}_{$this->lang}" ] ?? '';
+		if ( '' === trim( (string) $val ) ) {
+			$strings = ccc_strings();
+			$val     = $strings[ $this->lang ]['content'][ $base ] ?? '';
+		}
 		if ( '' === trim( (string) $val ) && 'en' !== $this->lang ) {
 			$val = $this->options[ "{$base}_en" ] ?? '';
 		}
@@ -370,7 +457,7 @@ gtag('config', '<?php echo esc_js( $id ); ?>');
 		<div class="ccc-banner__content">
 			<div class="ccc-banner__text">
 				<span class="ccc-banner__title"><?php echo $title; ?></span>
-				<span class="ccc-banner__desc"><?php echo $desc; ?></span><?php if ( $privacy_url ) : ?> <a class="ccc-banner__more" href="<?php echo $privacy_url; ?>" target="_blank" rel="noopener"><?php echo esc_html( $t['learn_more'] ); ?></a><?php endif; ?>
+				<span class="ccc-banner__desc"><?php echo $desc; ?><?php if ( $privacy_url ) : ?> <a href="<?php echo $privacy_url; ?>" target="_blank" rel="noopener"><?php echo esc_html( $t['learn_more'] ); ?></a><?php endif; ?></span>
 			</div>
 		</div>
 		<div class="ccc-banner__actions">

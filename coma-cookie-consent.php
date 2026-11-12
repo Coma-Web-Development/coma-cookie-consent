@@ -2,8 +2,8 @@
 /**
  * Plugin Name: Coma Cookie Consent
  * Plugin URI:  https://coma.lv
- * Description: GDPR-compliant cookie consent banner with Google Consent Mode v2. Multilingual (LV / RU / EN), auto-detects the active language.
- * Version:     1.6.3
+ * Description: GDPR-compliant cookie consent banner with Google Consent Mode v2. Multilingual (LV / RU / EN / LT / ET), auto-detects the active language.
+ * Version:     1.7.4
  * Author:      Coma
  * Author URI:  https://coma.lv
  * License:     GPL-2.0+
@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'CCC_VERSION',    '1.6.3' );
+define( 'CCC_VERSION',    '1.7.4' );
 define( 'CCC_DB_VERSION', '1' ); // bump when the consent-log schema changes
 define( 'CCC_PATH',    plugin_dir_path( __FILE__ ) );
 define( 'CCC_URL',     plugin_dir_url( __FILE__ ) );
@@ -66,6 +66,7 @@ function ccc_default_settings() {
 		'enable_marketing' => true,
 		'banner_position'  => 'bottom',
 		'revisit_button'   => true,
+		'align_selector'   => '',            // CSS selector of the theme's content container to align the banner with
 		// Colors. Empty background/text keeps the built-in dark banner; set them for a custom palette.
 		'accent_color'     => '#0094C8',  // primary buttons & links
 		'accent2_color'    => '',         // secondary accent (toggle "on" state); empty = same as accent
@@ -76,6 +77,8 @@ function ccc_default_settings() {
 		'load_ga'           => false,        // when true, the plugin loads gtag.js itself (consent-aware)
 		// Compliance.
 		'block_trackers'        => true,     // hold non-Google tracker scripts until consent
+		'block_google'          => false,    // also hold GTM / gtag.js / analytics.js until consent (Consent Mode alone otherwise)
+		'youtube_nocookie'      => false,    // rewrite YouTube embeds to youtube-nocookie.com
 		'consent_duration_days' => 180,      // how long a choice is remembered (re-prompt after)
 		'consent_version'       => 1,        // bump to force everyone to re-consent
 		'log_consent'           => true,     // store a server-side record of each choice

@@ -5,26 +5,43 @@
 	var settings      = window.cccSettings || {};
 	var COOKIE_EXPIRY = (settings.consentExpiry > 0) ? settings.consentExpiry : 180; // days
 	var CONSENT_VER   = settings.consentVersion || 1;
-	var LANG          = (settings.lang === 'lv' || settings.lang === 'ru' || settings.lang === 'en') ? settings.lang : 'en';
+	var LANG          = /^(lv|ru|en|lt|et)$/.test(settings.lang || '') ? settings.lang : 'en';
 	var MSG           = settings.strings || {};
 
 	// ── i18n helpers ─────────────────────────────────────────────────────────────
 
-	function t(obj)      { return (obj && (obj[LANG] || obj.en)) || ''; }       // {lv,ru,en} → string
-	function dur(token)  { return t(DUR[token] || DUR.unknown); }                // duration token → string
+	function t(obj)      { return (obj && (obj[LANG] || obj.en)) || ''; }       // {lv,ru,en,lt,et} → string
+	function dur(token)  { return token === 'consent' ? consentDur() : t(DUR[token] || DUR.unknown); } // duration token → string
+
+	// Lifetime of our own consent cookie — follows the "Remember choice for" setting.
+	function consentDur() {
+		var n = parseInt(COOKIE_EXPIRY, 10) || 180; // wp_localize_script passes it as a string
+		if (n === 365) { return t(DUR.y1); }
+		if (n === 730) { return t(DUR.y2); }
+		var d = n % 10, h = n % 100;
+		var one = d === 1 && h !== 11, few = d >= 2 && d <= 4 && (h < 12 || h > 14);
+		var words = {
+			lv: (d === 1 && h !== 11) ? 'diena' : 'dienas',
+			ru: one ? 'день' : (few ? 'дня' : 'дней'),
+			en: n === 1 ? 'day' : 'days',
+			lt: (d === 1 && h !== 11) ? 'diena' : ((d === 0 || (h >= 11 && h <= 19)) ? 'dienų' : 'dienos'),
+			et: n === 1 ? 'päev' : 'päeva'
+		};
+		return n + ' ' + (words[LANG] || words.en);
+	}
 
 	var DUR = {
-		session:    { lv: 'Sesija',     ru: 'Сессия',    en: 'Session' },
-		persistent: { lv: 'Pastāvīga',  ru: 'Постоянная', en: 'Persistent' },
-		min1:       { lv: '1 minūte',   ru: '1 минута',  en: '1 minute' },
-		min30:      { lv: '30 minūtes', ru: '30 минут',  en: '30 minutes' },
-		day1:       { lv: '1 diena',    ru: '1 день',    en: '1 day' },
-		day2:       { lv: '2 dienas',   ru: '2 дня',     en: '2 days' },
-		mo3:        { lv: '3 mēneši',   ru: '3 месяца',  en: '3 months' },
-		mo6:        { lv: '6 mēneši',   ru: '6 месяцев', en: '6 months' },
-		y1:         { lv: '1 gads',     ru: '1 год',     en: '1 year' },
-		y2:         { lv: '2 gadi',     ru: '2 года',    en: '2 years' },
-		unknown:    { lv: '?',          ru: '?',         en: '?' }
+		session:    { lv: 'Sesija',     ru: 'Сессия',    en: 'Session', lt: 'Seansas', et: 'Seanss' },
+		persistent: { lv: 'Pastāvīga',  ru: 'Постоянная', en: 'Persistent', lt: 'Nuolatinis', et: 'Püsiv' },
+		min1:       { lv: '1 minūte',   ru: '1 минута',  en: '1 minute', lt: '1 minutė', et: '1 minut' },
+		min30:      { lv: '30 minūtes', ru: '30 минут',  en: '30 minutes', lt: '30 minučių', et: '30 minutit' },
+		day1:       { lv: '1 diena',    ru: '1 день',    en: '1 day', lt: '1 diena', et: '1 päev' },
+		day2:       { lv: '2 dienas',   ru: '2 дня',     en: '2 days', lt: '2 dienos', et: '2 päeva' },
+		mo3:        { lv: '3 mēneši',   ru: '3 месяца',  en: '3 months', lt: '3 mėnesiai', et: '3 kuud' },
+		mo6:        { lv: '6 mēneši',   ru: '6 месяцев', en: '6 months', lt: '6 mėnesiai', et: '6 kuud' },
+		y1:         { lv: '1 gads',     ru: '1 год',     en: '1 year', lt: '1 metai', et: '1 aasta' },
+		y2:         { lv: '2 gadi',     ru: '2 года',    en: '2 years', lt: '2 metai', et: '2 aastat' },
+		unknown:    { lv: '?',          ru: '?',         en: '?', lt: '?', et: '?' }
 	};
 
 	// ── Open Cookie Database (lazy-loaded on first modal open) ───────────────────
@@ -35,9 +52,9 @@
 	var ocdState  = 'idle'; // idle | loading | done | failed
 	var OCD_CAT   = { 0: 'necessary', 1: 'analytics', 2: 'marketing' };
 	var OCD_DESC  = {
-		0: { lv: 'Funkcionāla / nepieciešama sīkdatne', ru: 'Функциональная / необходимая cookie', en: 'Functional / necessary cookie' },
-		1: { lv: 'Analītiskā sīkdatne',                 ru: 'Аналитическая cookie',               en: 'Analytics cookie' },
-		2: { lv: 'Mārketinga sīkdatne',                 ru: 'Маркетинговая cookie',               en: 'Marketing cookie' }
+		0: { lv: 'Funkcionāla / nepieciešama sīkdatne', ru: 'Функциональная / необходимая cookie', en: 'Functional / necessary cookie', lt: 'Funkcinis / būtinasis slapukas', et: 'Funktsionaalne / vajalik küpsis' },
+		1: { lv: 'Analītiskā sīkdatne',                 ru: 'Аналитическая cookie',               en: 'Analytics cookie', lt: 'Analitinis slapukas', et: 'Analüütiline küpsis' },
+		2: { lv: 'Mārketinga sīkdatne',                 ru: 'Маркетинговая cookie',               en: 'Marketing cookie', lt: 'Rinkodaros slapukas', et: 'Turundusküpsis' }
 	};
 
 	// Map a free-text retention string to a localized duration, falling back to the raw text.
@@ -102,39 +119,39 @@
 
 	var COOKIE_DB = [
 		// Necessary
-		{ test: exact('coma_consent'),              cat: 'necessary', name: 'coma_consent',              dur: 'y1',      desc: { lv: 'Saglabā jūsu sīkdatņu preferences',     ru: 'Сохраняет ваши настройки cookie',           en: 'Stores your cookie preferences' } },
-		{ test: prefix('wordpress_'),               cat: 'necessary', name: 'wordpress_*',               dur: 'session', desc: { lv: 'WordPress autentifikācija un drošība',  ru: 'Аутентификация и безопасность WordPress',   en: 'WordPress authentication and security' } },
-		{ test: prefix('wp-settings'),              cat: 'necessary', name: 'wp-settings*',              dur: 'y1',      desc: { lv: 'WordPress saskarnes iestatījumi',       ru: 'Настройки интерфейса WordPress',            en: 'WordPress interface settings' } },
-		{ test: prefix('wp-wpml_'),                 cat: 'necessary', name: 'wp-wpml_*',                  dur: 'session', desc: { lv: 'WPML — atceras izvēlēto valodu',        ru: 'WPML — запоминает выбранный язык',           en: 'WPML — remembers the selected language' } },
-		{ test: prefix('_icl_'),                    cat: 'necessary', name: '_icl_*',                    dur: 'session', desc: { lv: 'WPML — valodas pārvaldība',             ru: 'WPML — управление языком',                  en: 'WPML — language management' } },
-		{ test: exact('PHPSESSID'),                 cat: 'necessary', name: 'PHPSESSID',                 dur: 'session', desc: { lv: 'PHP sesijas identifikācija',            ru: 'Идентификация сессии PHP',                  en: 'PHP session identifier' } },
-		{ test: prefix('rc::'),                     cat: 'necessary', name: 'rc::*',                     dur: 'persistent', desc: { lv: 'Google reCAPTCHA — krāpšanas novēršana', ru: 'Google reCAPTCHA — защита от мошенничества', en: 'Google reCAPTCHA — fraud prevention' } },
-		{ test: prefix('comment_author'),           cat: 'necessary', name: 'comment_author_*',          dur: 'y1',      desc: { lv: 'WordPress — atceras komentāru autoru',  ru: 'WordPress — запоминает автора комментария', en: 'WordPress — remembers the comment author' } },
-		{ test: exact('woocommerce_cart_hash'),     cat: 'necessary', name: 'woocommerce_cart_hash',     dur: 'session', desc: { lv: 'WooCommerce — groza identifikācija',    ru: 'WooCommerce — идентификация корзины',       en: 'WooCommerce — cart identifier' }, requires: 'hasWoocommerce' },
-		{ test: exact('woocommerce_items_in_cart'), cat: 'necessary', name: 'woocommerce_items_in_cart', dur: 'session', desc: { lv: 'WooCommerce — produktu skaits grozā',   ru: 'WooCommerce — количество товаров в корзине', en: 'WooCommerce — number of items in cart' }, requires: 'hasWoocommerce' },
-		{ test: exact('wc_session_cookie'),         cat: 'necessary', name: 'wc_session_cookie',         dur: 'day2',    desc: { lv: 'WooCommerce — sesijas dati',            ru: 'WooCommerce — данные сессии',               en: 'WooCommerce — session data' }, requires: 'hasWoocommerce' },
+		{ test: exact('coma_consent'),              cat: 'necessary', name: 'coma_consent',              dur: 'consent',      desc: { lv: 'Saglabā jūsu sīkdatņu preferences',     ru: 'Сохраняет ваши настройки cookie',           en: 'Stores your cookie preferences', lt: 'Saugo jūsų slapukų nustatymus', et: 'Salvestab teie küpsiste eelistused' } },
+		{ test: prefix('wordpress_'),               cat: 'necessary', name: 'wordpress_*',               dur: 'session', desc: { lv: 'WordPress autentifikācija un drošība',  ru: 'Аутентификация и безопасность WordPress',   en: 'WordPress authentication and security', lt: 'WordPress autentifikacija ir sauga', et: 'WordPressi autentimine ja turvalisus' } },
+		{ test: prefix('wp-settings'),              cat: 'necessary', name: 'wp-settings*',              dur: 'y1',      desc: { lv: 'WordPress saskarnes iestatījumi',       ru: 'Настройки интерфейса WordPress',            en: 'WordPress interface settings', lt: 'WordPress sąsajos nustatymai', et: 'WordPressi liidese seaded' } },
+		{ test: prefix('wp-wpml_'),                 cat: 'necessary', name: 'wp-wpml_*',                  dur: 'session', desc: { lv: 'WPML — atceras izvēlēto valodu',        ru: 'WPML — запоминает выбранный язык',           en: 'WPML — remembers the selected language', lt: 'WPML — įsimena pasirinktą kalbą', et: 'WPML — jätab meelde valitud keele' } },
+		{ test: prefix('_icl_'),                    cat: 'necessary', name: '_icl_*',                    dur: 'session', desc: { lv: 'WPML — valodas pārvaldība',             ru: 'WPML — управление языком',                  en: 'WPML — language management', lt: 'WPML — kalbos valdymas', et: 'WPML — keele haldus' } },
+		{ test: exact('PHPSESSID'),                 cat: 'necessary', name: 'PHPSESSID',                 dur: 'session', desc: { lv: 'PHP sesijas identifikācija',            ru: 'Идентификация сессии PHP',                  en: 'PHP session identifier', lt: 'PHP sesijos identifikatorius', et: 'PHP seansi identifikaator' } },
+		{ test: prefix('rc::'),                     cat: 'necessary', name: 'rc::*',                     dur: 'persistent', desc: { lv: 'Google reCAPTCHA — krāpšanas novēršana', ru: 'Google reCAPTCHA — защита от мошенничества', en: 'Google reCAPTCHA — fraud prevention', lt: 'Google reCAPTCHA — sukčiavimo prevencija', et: 'Google reCAPTCHA — pettuste ennetamine' } },
+		{ test: prefix('comment_author'),           cat: 'necessary', name: 'comment_author_*',          dur: 'y1',      desc: { lv: 'WordPress — atceras komentāru autoru',  ru: 'WordPress — запоминает автора комментария', en: 'WordPress — remembers the comment author', lt: 'WordPress — įsimena komentaro autorių', et: 'WordPress — jätab meelde kommentaari autori' } },
+		{ test: exact('woocommerce_cart_hash'),     cat: 'necessary', name: 'woocommerce_cart_hash',     dur: 'session', desc: { lv: 'WooCommerce — groza identifikācija',    ru: 'WooCommerce — идентификация корзины',       en: 'WooCommerce — cart identifier', lt: 'WooCommerce — krepšelio identifikatorius', et: 'WooCommerce — ostukorvi identifikaator' }, requires: 'hasWoocommerce' },
+		{ test: exact('woocommerce_items_in_cart'), cat: 'necessary', name: 'woocommerce_items_in_cart', dur: 'session', desc: { lv: 'WooCommerce — produktu skaits grozā',   ru: 'WooCommerce — количество товаров в корзине', en: 'WooCommerce — number of items in cart', lt: 'WooCommerce — prekių skaičius krepšelyje', et: 'WooCommerce — toodete arv ostukorvis' }, requires: 'hasWoocommerce' },
+		{ test: exact('wc_session_cookie'),         cat: 'necessary', name: 'wc_session_cookie',         dur: 'day2',    desc: { lv: 'WooCommerce — sesijas dati',            ru: 'WooCommerce — данные сессии',               en: 'WooCommerce — session data', lt: 'WooCommerce — sesijos duomenys', et: 'WooCommerce — seansi andmed' }, requires: 'hasWoocommerce' },
 
 		// Analytics
-		{ test: exact('_ga'),                       cat: 'analytics', name: '_ga',                       dur: 'y2',      desc: { lv: 'Google Analytics — apmeklētāja identifikācija', ru: 'Google Analytics — идентификация посетителя', en: 'Google Analytics — visitor identifier' } },
-		{ test: prefix('_ga_'),                     cat: 'analytics', name: '_ga_*',                     dur: 'y2',      desc: { lv: 'Google Analytics — sesijas dati',       ru: 'Google Analytics — данные сессии',          en: 'Google Analytics — session data' } },
-		{ test: exact('_gid'),                      cat: 'analytics', name: '_gid',                      dur: 'day1',    desc: { lv: 'Google Analytics — lietotāja atšķiršana', ru: 'Google Analytics — различение пользователей', en: 'Google Analytics — user distinction' } },
-		{ test: prefix('_gat'),                     cat: 'analytics', name: '_gat*',                     dur: 'min1',    desc: { lv: 'Google Analytics — pieprasījumu ierobežošana', ru: 'Google Analytics — ограничение запросов', en: 'Google Analytics — request throttling' } },
-		{ test: exact('__utma'),                    cat: 'analytics', name: '__utma',                    dur: 'y2',      desc: { lv: 'Google Analytics — apmeklējumu izsekošana', ru: 'Google Analytics — отслеживание визитов', en: 'Google Analytics — visit tracking' } },
-		{ test: exact('__utmb'),                    cat: 'analytics', name: '__utmb',                    dur: 'min30',   desc: { lv: 'Google Analytics — sesijas ilgums',     ru: 'Google Analytics — длительность сессии',    en: 'Google Analytics — session duration' } },
-		{ test: exact('__utmc'),                    cat: 'analytics', name: '__utmc',                    dur: 'session', desc: { lv: 'Google Analytics — sesija',             ru: 'Google Analytics — сессия',                 en: 'Google Analytics — session' } },
-		{ test: exact('__utmz'),                    cat: 'analytics', name: '__utmz',                    dur: 'mo6',     desc: { lv: 'Google Analytics — trafika avots',      ru: 'Google Analytics — источник трафика',       en: 'Google Analytics — traffic source' } },
+		{ test: exact('_ga'),                       cat: 'analytics', name: '_ga',                       dur: 'y2',      desc: { lv: 'Google Analytics — apmeklētāja identifikācija', ru: 'Google Analytics — идентификация посетителя', en: 'Google Analytics — visitor identifier', lt: 'Google Analytics — lankytojo identifikatorius', et: 'Google Analytics — külastaja identifikaator' } },
+		{ test: prefix('_ga_'),                     cat: 'analytics', name: '_ga_*',                     dur: 'y2',      desc: { lv: 'Google Analytics — sesijas dati',       ru: 'Google Analytics — данные сессии',          en: 'Google Analytics — session data', lt: 'Google Analytics — sesijos duomenys', et: 'Google Analytics — seansi andmed' } },
+		{ test: exact('_gid'),                      cat: 'analytics', name: '_gid',                      dur: 'day1',    desc: { lv: 'Google Analytics — lietotāja atšķiršana', ru: 'Google Analytics — различение пользователей', en: 'Google Analytics — user distinction', lt: 'Google Analytics — naudotojų atskyrimas', et: 'Google Analytics — kasutajate eristamine' } },
+		{ test: prefix('_gat'),                     cat: 'analytics', name: '_gat*',                     dur: 'min1',    desc: { lv: 'Google Analytics — pieprasījumu ierobežošana', ru: 'Google Analytics — ограничение запросов', en: 'Google Analytics — request throttling', lt: 'Google Analytics — užklausų ribojimas', et: 'Google Analytics — päringute piiramine' } },
+		{ test: exact('__utma'),                    cat: 'analytics', name: '__utma',                    dur: 'y2',      desc: { lv: 'Google Analytics — apmeklējumu izsekošana', ru: 'Google Analytics — отслеживание визитов', en: 'Google Analytics — visit tracking', lt: 'Google Analytics — apsilankymų sekimas', et: 'Google Analytics — külastuste jälgimine' } },
+		{ test: exact('__utmb'),                    cat: 'analytics', name: '__utmb',                    dur: 'min30',   desc: { lv: 'Google Analytics — sesijas ilgums',     ru: 'Google Analytics — длительность сессии',    en: 'Google Analytics — session duration', lt: 'Google Analytics — sesijos trukmė', et: 'Google Analytics — seansi kestus' } },
+		{ test: exact('__utmc'),                    cat: 'analytics', name: '__utmc',                    dur: 'session', desc: { lv: 'Google Analytics — sesija',             ru: 'Google Analytics — сессия',                 en: 'Google Analytics — session', lt: 'Google Analytics — sesija', et: 'Google Analytics — seanss' } },
+		{ test: exact('__utmz'),                    cat: 'analytics', name: '__utmz',                    dur: 'mo6',     desc: { lv: 'Google Analytics — trafika avots',      ru: 'Google Analytics — источник трафика',       en: 'Google Analytics — traffic source', lt: 'Google Analytics — srauto šaltinis', et: 'Google Analytics — liikluse allikas' } },
 
 		// Marketing
-		{ test: prefix('sbjs_'),                    cat: 'marketing', name: 'sbjs_*',                    dur: 'mo6',     desc: { lv: 'WooCommerce — pasūtījuma avota atribūcija (Sourcebuster)', ru: 'WooCommerce — атрибуция источника заказа (Sourcebuster)', en: 'WooCommerce — order source attribution (Sourcebuster)' } },
-		{ test: exact('_fbp'),                      cat: 'marketing', name: '_fbp',                      dur: 'mo3',     desc: { lv: 'Facebook Pixel — apmeklētāju izsekošana', ru: 'Facebook Pixel — отслеживание посетителей', en: 'Facebook Pixel — visitor tracking' } },
-		{ test: exact('_fbc'),                      cat: 'marketing', name: '_fbc',                      dur: 'mo3',     desc: { lv: 'Facebook — klikšķu izsekošana',         ru: 'Facebook — отслеживание кликов',            en: 'Facebook — click tracking' } },
-		{ test: exact('fr'),                        cat: 'marketing', name: 'fr',                        dur: 'mo3',     desc: { lv: 'Facebook — reklāmu izsekošana',         ru: 'Facebook — отслеживание рекламы',           en: 'Facebook — ad tracking' } },
-		{ test: prefix('_gcl_'),                    cat: 'marketing', name: '_gcl_*',                    dur: 'mo3',     desc: { lv: 'Google Ads — konversijas izsekošana',   ru: 'Google Ads — отслеживание конверсий',       en: 'Google Ads — conversion tracking' } },
-		{ test: exact('IDE'),                       cat: 'marketing', name: 'IDE',                       dur: 'y1',      desc: { lv: 'Google Display — reklāmu personalizācija', ru: 'Google Display — персонализация рекламы', en: 'Google Display — ad personalisation' } },
-		{ test: exact('NID'),                       cat: 'marketing', name: 'NID',                       dur: 'mo6',     desc: { lv: 'Google — reklāmu preferences',          ru: 'Google — настройки рекламы',                en: 'Google — ad preferences' } },
-		{ test: prefix('_tt_'),                     cat: 'marketing', name: '_tt_*',                     dur: 'y1',      desc: { lv: 'TikTok Pixel — reklāmu izsekošana',     ru: 'TikTok Pixel — отслеживание рекламы',       en: 'TikTok Pixel — ad tracking' } },
-		{ test: prefix('_ttp'),                     cat: 'marketing', name: '_ttp',                      dur: 'y1',      desc: { lv: 'TikTok — reklāmu izsekošana',           ru: 'TikTok — отслеживание рекламы',             en: 'TikTok — ad tracking' } },
-		{ test: prefix('li_'),                      cat: 'marketing', name: 'li_*',                      dur: 'mo6',     desc: { lv: 'LinkedIn Insight — reklāmu izsekošana', ru: 'LinkedIn Insight — отслеживание рекламы',   en: 'LinkedIn Insight — ad tracking' } },
+		{ test: prefix('sbjs_'),                    cat: 'marketing', name: 'sbjs_*',                    dur: 'mo6',     desc: { lv: 'WooCommerce — pasūtījuma avota atribūcija (Sourcebuster)', ru: 'WooCommerce — атрибуция источника заказа (Sourcebuster)', en: 'WooCommerce — order source attribution (Sourcebuster)', lt: 'WooCommerce — užsakymo šaltinio priskyrimas (Sourcebuster)', et: 'WooCommerce — tellimuse allika omistamine (Sourcebuster)' } },
+		{ test: exact('_fbp'),                      cat: 'marketing', name: '_fbp',                      dur: 'mo3',     desc: { lv: 'Facebook Pixel — apmeklētāju izsekošana', ru: 'Facebook Pixel — отслеживание посетителей', en: 'Facebook Pixel — visitor tracking', lt: 'Facebook Pixel — lankytojų sekimas', et: 'Facebook Pixel — külastajate jälgimine' } },
+		{ test: exact('_fbc'),                      cat: 'marketing', name: '_fbc',                      dur: 'mo3',     desc: { lv: 'Facebook — klikšķu izsekošana',         ru: 'Facebook — отслеживание кликов',            en: 'Facebook — click tracking', lt: 'Facebook — paspaudimų sekimas', et: 'Facebook — klikkide jälgimine' } },
+		{ test: exact('fr'),                        cat: 'marketing', name: 'fr',                        dur: 'mo3',     desc: { lv: 'Facebook — reklāmu izsekošana',         ru: 'Facebook — отслеживание рекламы',           en: 'Facebook — ad tracking', lt: 'Facebook — reklamos sekimas', et: 'Facebook — reklaamide jälgimine' } },
+		{ test: prefix('_gcl_'),                    cat: 'marketing', name: '_gcl_*',                    dur: 'mo3',     desc: { lv: 'Google Ads — konversijas izsekošana',   ru: 'Google Ads — отслеживание конверсий',       en: 'Google Ads — conversion tracking', lt: 'Google Ads — konversijų sekimas', et: 'Google Ads — konversioonide jälgimine' } },
+		{ test: exact('IDE'),                       cat: 'marketing', name: 'IDE',                       dur: 'y1',      desc: { lv: 'Google Display — reklāmu personalizācija', ru: 'Google Display — персонализация рекламы', en: 'Google Display — ad personalisation', lt: 'Google Display — reklamos personalizavimas', et: 'Google Display — reklaamide isikupärastamine' } },
+		{ test: exact('NID'),                       cat: 'marketing', name: 'NID',                       dur: 'mo6',     desc: { lv: 'Google — reklāmu preferences',          ru: 'Google — настройки рекламы',                en: 'Google — ad preferences', lt: 'Google — reklamos nustatymai', et: 'Google — reklaamieelistused' } },
+		{ test: prefix('_tt_'),                     cat: 'marketing', name: '_tt_*',                     dur: 'y1',      desc: { lv: 'TikTok Pixel — reklāmu izsekošana',     ru: 'TikTok Pixel — отслеживание рекламы',       en: 'TikTok Pixel — ad tracking', lt: 'TikTok Pixel — reklamos sekimas', et: 'TikTok Pixel — reklaamide jälgimine' } },
+		{ test: prefix('_ttp'),                     cat: 'marketing', name: '_ttp',                      dur: 'y1',      desc: { lv: 'TikTok — reklāmu izsekošana',           ru: 'TikTok — отслеживание рекламы',             en: 'TikTok — ad tracking', lt: 'TikTok — reklamos sekimas', et: 'TikTok — reklaamide jälgimine' } },
+		{ test: prefix('li_'),                      cat: 'marketing', name: 'li_*',                      dur: 'mo6',     desc: { lv: 'LinkedIn Insight — reklāmu izsekošana', ru: 'LinkedIn Insight — отслеживание рекламы',   en: 'LinkedIn Insight — ad tracking', lt: 'LinkedIn Insight — reklamos sekimas', et: 'LinkedIn Insight — reklaamide jälgimine' } },
 	];
 
 	// Script URL/content patterns → which DB entries to guarantee even if cookie not yet set
@@ -325,16 +342,24 @@
 	}
 
 	// ── Tracker un-blocking ──────────────────────────────────────────────────────
-	// Re-activate scripts the server neutralised (type="text/plain" data-ccc-block)
-	// for any category the visitor has now granted.
+	// Re-activate scripts/iframes the server neutralised (data-ccc-block) for any
+	// category the visitor has now granted. A compound category ("analytics+marketing")
+	// needs every part granted.
+
+	function granted(consent, cat) {
+		var parts = String(cat || '').split('+');
+		for (var i = 0; i < parts.length; i++) {
+			if (!consent[parts[i]]) return false;
+		}
+		return parts.length > 0;
+	}
 
 	function unblockScripts(consent) {
 		if (!settings.blockTrackers) return;
 		var nodes = document.querySelectorAll('script[type="text/plain"][data-ccc-block]');
 		for (var i = 0; i < nodes.length; i++) {
 			var old = nodes[i];
-			var cat = old.getAttribute('data-ccc-block');
-			if (!consent[cat]) continue;
+			if (!granted(consent, old.getAttribute('data-ccc-block'))) continue;
 			var s = document.createElement('script');
 			for (var j = 0; j < old.attributes.length; j++) {
 				var a = old.attributes[j];
@@ -342,8 +367,22 @@
 				if (a.name === 'data-ccc-src') { s.src = a.value; continue; }
 				s.setAttribute(a.name, a.value);
 			}
-			if (!s.src) { s.textContent = old.textContent; }
+			if (s.src) {
+				// Injected external scripts are async by default; keep document order
+				// unless the original tag asked for async itself.
+				if (!old.hasAttribute('async')) { s.async = false; }
+			} else {
+				s.textContent = old.textContent;
+			}
 			old.parentNode.replaceChild(s, old);
+		}
+		var frames = document.querySelectorAll('iframe[data-ccc-block][data-ccc-src]');
+		for (var k = 0; k < frames.length; k++) {
+			var f = frames[k];
+			if (!granted(consent, f.getAttribute('data-ccc-block'))) continue;
+			f.setAttribute('src', f.getAttribute('data-ccc-src'));
+			f.removeAttribute('data-ccc-src');
+			f.removeAttribute('data-ccc-block');
 		}
 	}
 
@@ -387,24 +426,39 @@
 	var overlay = document.getElementById('ccc-overlay');
 	var revisit = document.getElementById('ccc-revisit');
 
-	// Publish the banner's height as --ccc-banner-h on <html> (0px when hidden),
-	// so a site's own fixed bottom bar can sit above the banner instead of under it:
-	//   .my-bar { bottom: var(--ccc-banner-h, 0px); }
-	function syncBannerHeight() {
-		var h = (banner && !banner.hidden) ? Math.round(banner.getBoundingClientRect().height) : 0;
-		document.documentElement.style.setProperty('--ccc-banner-h', h + 'px');
+	// Line the banner content up with the theme's content container (settings.alignSelector).
+	function alignBanner() {
+		var inner = banner && banner.querySelector('.ccc-banner__inner');
+		var box   = settings.alignSelector && document.querySelector(settings.alignSelector);
+		if (!inner || !box || banner.hidden) return;
+		var r     = box.getBoundingClientRect();
+		var cs    = window.getComputedStyle(box);
+		var vw    = document.documentElement.clientWidth;
+		var left  = r.left + (parseFloat(cs.paddingLeft) || 0);
+		var right = vw - r.right + (parseFloat(cs.paddingRight) || 0);
+		if (r.width < 200 || left < 12 || right < 12) {
+			inner.style.removeProperty('max-width');
+			inner.style.removeProperty('padding');
+			return;
+		}
+		inner.style.setProperty('max-width', 'none', 'important');
+		inner.style.setProperty('padding', '0 ' + Math.round(right) + 'px 0 ' + Math.round(left) + 'px', 'important');
 	}
-	window.addEventListener('resize', syncBannerHeight);
+
+	var alignTimer;
+	window.addEventListener('resize', function () {
+		clearTimeout(alignTimer);
+		alignTimer = setTimeout(alignBanner, 100);
+	});
 
 	function showBanner() {
 		if (banner) banner.hidden = false;
-		syncBannerHeight();
 		if (revisit) revisit.hidden = true;
+		alignBanner();
 	}
 
 	function hideBanner() {
 		if (banner) banner.hidden = true;
-		syncBannerHeight();
 		if (revisit && settings.revisitButton) revisit.hidden = false;
 	}
 

@@ -45,17 +45,28 @@ class CCC_Admin {
 			'background_color'  => sanitize_hex_color( $input['background_color'] ?? '' ) ?: '',
 			'text_color'        => sanitize_hex_color( $input['text_color'] ?? '' ) ?: '',
 			'revisit_button'    => ! empty( $input['revisit_button'] ),
+			'align_selector'    => sanitize_text_field( $input['align_selector'] ?? '' ),
 			'ga_measurement_id' => sanitize_text_field( $input['ga_measurement_id'] ?? '' ),
 			'load_ga'           => ! empty( $input['load_ga'] ),
 			// Compliance.
 			'block_trackers'        => ! empty( $input['block_trackers'] ),
+			'block_google'          => ! empty( $input['block_google'] ),
+			'youtube_nocookie'      => ! empty( $input['youtube_nocookie'] ),
 			'consent_duration_days' => max( 1, min( 730, (int) ( $input['consent_duration_days'] ?? 180 ) ) ),
 			'consent_version'       => max( 1, (int) ( $input['consent_version'] ?? 1 ) ),
 			'log_consent'           => ! empty( $input['log_consent'] ),
 			'gating_region'         => in_array( $input['gating_region'] ?? 'global', array( 'global', 'eea' ), true ) ? $input['gating_region'] : 'global',
 		);
 
+		// Languages the site doesn't serve aren't on the form — keep their stored values.
+		$stored = get_option( CCC_OPTION, array() );
 		foreach ( $langs as $lang ) {
+			if ( ! isset( $input[ "banner_title_$lang" ] ) ) {
+				foreach ( array( 'banner_title', 'banner_description', 'privacy_page_url' ) as $base ) {
+					$out[ "{$base}_$lang" ] = $stored[ "{$base}_$lang" ] ?? '';
+				}
+				continue;
+			}
 			$out[ "banner_title_$lang" ]       = sanitize_text_field( $input[ "banner_title_$lang" ] ?? '' );
 			$out[ "banner_description_$lang" ] = sanitize_textarea_field( $input[ "banner_description_$lang" ] ?? '' );
 			$out[ "privacy_page_url_$lang" ]   = esc_url_raw( $input[ "privacy_page_url_$lang" ] ?? '' );
@@ -68,66 +79,86 @@ class CCC_Admin {
 		$o       = $this->options;
 		$strings = ccc_strings();
 		$opt     = CCC_OPTION;
+		$names   = ccc_language_names();
+		$multi   = function_exists( 'pll_languages_list' ) || defined( 'ICL_SITEPRESS_VERSION' );
+		// Single-language site whose WP language already matches the banner language:
+		// nothing to choose, so the selector is hidden (value still submitted).
+		$wp_lang   = strtolower( substr( get_locale(), 0, 2 ) );
+		$hide_lang = ! $multi && ( $o['default_lang'] ?? 'lv' ) === $wp_lang;
 		?>
 		<div class="wrap">
 			<h1>Cookie Consent</h1>
 			<form method="post" action="options.php">
 				<?php settings_fields( 'ccc_group' ); ?>
+				<?php if ( $hide_lang ) : ?>
+					<input type="hidden" name="<?php echo $opt; ?>[default_lang]" value="<?php echo esc_attr( $o['default_lang'] ); ?>" />
+				<?php endif; ?>
 
-				<h2>Vispārīgie iestatījumi / General</h2>
+				<h2>General</h2>
 				<table class="form-table">
+					<?php if ( ! $hide_lang ) : ?>
 					<tr>
-						<th>Noklusējuma valoda<br><span style="font-weight:400;color:#666">Default / fallback language</span></th>
+						<th><?php echo $multi ? 'Fallback language' : 'Banner language'; ?></th>
 						<td>
 							<select name="<?php echo $opt; ?>[default_lang]">
 								<?php foreach ( ccc_languages() as $lang ) : ?>
 									<option value="<?php echo esc_attr( $lang ); ?>" <?php selected( $o['default_lang'] ?? 'lv', $lang ); ?>>
-										<?php echo esc_html( $strings[ $lang ]['label'] ); ?> (<?php echo esc_html( strtoupper( $lang ) ); ?>)
+										<?php echo esc_html( $names[ $lang ] ); ?> (<?php echo esc_html( strtoupper( $lang ) ); ?>)
 									</option>
 								<?php endforeach; ?>
 							</select>
-							<p class="description">Used when the visitor's language isn't LV / RU / EN. The banner auto-detects language via Polylang, WPML, or the site locale.</p>
+							<?php if ( $multi ) : ?>
+								<p class="description">Used when the visitor's language isn't LV / RU / EN / LT / ET. The banner auto-detects the language via Polylang or WPML (language locale first, then code).</p>
+							<?php else : ?>
+								<p class="description">No multilingual plugin detected and the WordPress site language differs — the banner is always shown in this language.</p>
+							<?php endif; ?>
 						</td>
 					</tr>
+					<?php endif; ?>
 					<tr>
-						<th>Banera pozīcija / Position</th>
+						<th>Position</th>
 						<td>
 							<select name="<?php echo $opt; ?>[banner_position]">
-								<option value="bottom" <?php selected( $o['banner_position'] ?? 'bottom', 'bottom' ); ?>>Apakšā / Bottom</option>
-								<option value="top" <?php selected( $o['banner_position'] ?? 'bottom', 'top' ); ?>>Augšā / Top</option>
+								<option value="bottom" <?php selected( $o['banner_position'] ?? 'bottom', 'bottom' ); ?>>Bottom</option>
+								<option value="top" <?php selected( $o['banner_position'] ?? 'bottom', 'top' ); ?>>Top</option>
 							</select>
 						</td>
 					</tr>
 					<tr>
-						<th>Akcenta krāsa / Accent color</th>
+						<th>Accent color</th>
 						<td><input type="color" name="<?php echo $opt; ?>[accent_color]" value="<?php echo esc_attr( $o['accent_color'] ?? '#0094C8' ); ?>" />
 							<span class="description">Primary buttons &amp; links</span></td>
 					</tr>
 					<tr>
-						<th>Akcents 2 / Accent 2</th>
+						<th>Accent 2</th>
 						<td><input type="text" name="<?php echo $opt; ?>[accent2_color]" value="<?php echo esc_attr( $o['accent2_color'] ?? '' ); ?>" class="regular-text" placeholder="#5cc2b2 — empty = same as accent" />
 							<p class="description">Secondary accent — the toggle "on" state. Leave empty to match the main accent.</p></td>
 					</tr>
 					<tr>
-						<th>Fona krāsa / Background</th>
+						<th>Background</th>
 						<td><input type="text" name="<?php echo $opt; ?>[background_color]" value="<?php echo esc_attr( $o['background_color'] ?? '' ); ?>" class="regular-text" placeholder="#f4f4f4 — empty = built-in dark theme" />
 							<p class="description">Banner &amp; modal background. Empty keeps the built-in theme. Set this for a custom (e.g. light) banner.</p></td>
 					</tr>
 					<tr>
-						<th>Teksta krāsa / Text</th>
+						<th>Text color</th>
 						<td><input type="text" name="<?php echo $opt; ?>[text_color]" value="<?php echo esc_attr( $o['text_color'] ?? '' ); ?>" class="regular-text" placeholder="#2c2c2c — empty = built-in" />
 							<p class="description">Body text colour. Used together with a custom background.</p></td>
 					</tr>
 					<tr>
-						<th>Kategorijas / Categories</th>
+						<th>Categories</th>
 						<td>
 							<label><input type="checkbox" name="<?php echo $opt; ?>[enable_analytics]" value="1" <?php checked( ! empty( $o['enable_analytics'] ) ); ?> /> Analytics</label><br>
 							<label><input type="checkbox" name="<?php echo $opt; ?>[enable_marketing]" value="1" <?php checked( ! empty( $o['enable_marketing'] ) ); ?> /> Marketing</label>
 						</td>
 					</tr>
 					<tr>
-						<th>Iestatījumu poga / Revisit button</th>
+						<th>Revisit button</th>
 						<td><label><input type="checkbox" name="<?php echo $opt; ?>[revisit_button]" value="1" <?php checked( ! empty( $o['revisit_button'] ) ); ?> /> Show the floating cookie-settings button</label></td>
+					</tr>
+					<tr>
+						<th>Align with</th>
+						<td><input type="text" name="<?php echo $opt; ?>[align_selector]" value="<?php echo esc_attr( $o['align_selector'] ?? '' ); ?>" class="regular-text" placeholder="#main .container" />
+							<p class="description">CSS selector of the theme's content container. The banner text and buttons then line up with the site's content edges at every width. Empty = built-in 1280px layout.</p></td>
 					</tr>
 				</table>
 
@@ -146,13 +177,26 @@ class CCC_Admin {
 					</tr>
 				</table>
 
-				<h2>Atbilstība / Compliance</h2>
+				<h2>Compliance</h2>
 				<table class="form-table">
 					<tr>
 						<th>Block trackers until consent</th>
 						<td>
 							<label><input type="checkbox" name="<?php echo $opt; ?>[block_trackers]" value="1" <?php checked( ! empty( $o['block_trackers'] ) ); ?> /> Hold non-Google tracker scripts (Meta, TikTok, LinkedIn, Hotjar, …) until the visitor opts in</label>
-							<p class="description">Google tags are not blocked — Consent Mode v2 governs those. GTM-injected tags should be gated inside GTM with consent triggers.</p>
+							<p class="description">Also holds WooCommerce order attribution (sbjs_* cookies) and third-party widgets (draugiem.lv, Facebook plugins). Google tags are not blocked unless the option below is on — Consent Mode v2 governs those.</p>
+						</td>
+					</tr>
+					<tr>
+						<th>Hold Google tags too</th>
+						<td>
+							<label><input type="checkbox" name="<?php echo $opt; ?>[block_google]" value="1" <?php checked( ! empty( $o['block_google'] ) ); ?> /> Hold GTM, gtag.js and analytics.js until consent (strict mode)</label>
+							<p class="description">Turn ON when the GTM container fires non-Google tags (Meta, TikTok, Pinterest, Bing, Hotjar…) without consent checks — Consent Mode cannot stop those. GTM then loads only after <em>both</em> Analytics and Marketing are accepted (filter <code>ccc_gtm_category</code>); gtag.js/analytics.js after Analytics.</p>
+						</td>
+					</tr>
+					<tr>
+						<th>YouTube privacy mode</th>
+						<td>
+							<label><input type="checkbox" name="<?php echo $opt; ?>[youtube_nocookie]" value="1" <?php checked( ! empty( $o['youtube_nocookie'] ) ); ?> /> Rewrite YouTube embeds to youtube-nocookie.com</label>
 						</td>
 					</tr>
 					<tr>
@@ -188,27 +232,27 @@ class CCC_Admin {
 					</tr>
 				</table>
 
-				<h2>Banera teksts / Banner text per language</h2>
-				<p class="description">Leave a field empty to fall back to the built-in default for that language.</p>
-				<?php foreach ( ccc_languages() as $lang ) : $L = strtoupper( $lang ); ?>
-					<h3 style="margin-bottom:0"><?php echo esc_html( $strings[ $lang ]['label'] ); ?> (<?php echo esc_html( $L ); ?>)</h3>
+				<h2><?php echo $multi ? 'Banner text per language' : 'Banner text'; ?></h2>
+				<p class="description">Leave a field empty to use the built-in default text.</p>
+				<?php foreach ( ccc_site_languages() as $lang ) : $L = strtoupper( $lang ); ?>
+					<?php if ( $multi ) : ?><h3 style="margin-bottom:0"><?php echo esc_html( $names[ $lang ] ); ?> (<?php echo esc_html( $L ); ?>)</h3><?php endif; ?>
 					<table class="form-table">
 						<tr>
-							<th>Virsraksts / Title</th>
+							<th>Title</th>
 							<td><input type="text" name="<?php echo $opt; ?>[banner_title_<?php echo $lang; ?>]" value="<?php echo esc_attr( $o[ "banner_title_$lang" ] ?? '' ); ?>" class="large-text" placeholder="<?php echo esc_attr( $strings[ $lang ]['content']['banner_title'] ); ?>" /></td>
 						</tr>
 						<tr>
-							<th>Teksts / Description</th>
+							<th>Description</th>
 							<td><textarea name="<?php echo $opt; ?>[banner_description_<?php echo $lang; ?>]" rows="3" class="large-text" placeholder="<?php echo esc_attr( $strings[ $lang ]['content']['banner_description'] ); ?>"><?php echo esc_textarea( $o[ "banner_description_$lang" ] ?? '' ); ?></textarea></td>
 						</tr>
 						<tr>
-							<th>Privātuma politikas URL<br><span style="font-weight:400;color:#666">Privacy policy URL</span></th>
+							<th>Privacy policy URL</th>
 							<td><input type="url" name="<?php echo $opt; ?>[privacy_page_url_<?php echo $lang; ?>]" value="<?php echo esc_attr( $o[ "privacy_page_url_$lang" ] ?? '' ); ?>" class="large-text" placeholder="https://example.com/privacy/" /></td>
 						</tr>
 					</table>
 				<?php endforeach; ?>
 
-				<?php submit_button( 'Saglabāt / Save' ); ?>
+				<?php submit_button( 'Save' ); ?>
 			</form>
 		</div>
 		<?php
