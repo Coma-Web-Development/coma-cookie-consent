@@ -13,7 +13,11 @@
 	--ccc-th-bg:        #e2e2e2;
 	--ccc-radius:       8px;
 	--ccc-radius-lg:    12px;
-	--ccc-z:            9999999;
+	/* Third-party chat widgets sit very high (Kommo's .amo-button-holder is at
+	   z-index 10000001) and their floating bubble covered the Accept button and
+	   swallowed its clicks. Use the practical top of the 32-bit z-index range;
+	   one below INT_MAX so the modal's calc(var(--ccc-z) + 1) cannot overflow. */
+	--ccc-z:            2147483646;
 }
 
 /* Ensure hidden attribute always wins over our display overrides */
