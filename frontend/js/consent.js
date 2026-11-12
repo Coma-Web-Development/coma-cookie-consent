@@ -451,14 +451,25 @@
 		alignTimer = setTimeout(alignBanner, 100);
 	});
 
+	// Publish the banner's height as --ccc-banner-h on <html> (0px when hidden),
+	// so a site's own fixed bottom bar can sit above the banner instead of under it:
+	//   .my-bar { bottom: var(--ccc-banner-h, 0px); }
+	function syncBannerHeight() {
+		var h = (banner && !banner.hidden) ? Math.round(banner.getBoundingClientRect().height) : 0;
+		document.documentElement.style.setProperty('--ccc-banner-h', h + 'px');
+	}
+	window.addEventListener('resize', syncBannerHeight);
+
 	function showBanner() {
 		if (banner) banner.hidden = false;
 		if (revisit) revisit.hidden = true;
 		alignBanner();
+		syncBannerHeight();
 	}
 
 	function hideBanner() {
 		if (banner) banner.hidden = true;
+		syncBannerHeight();
 		if (revisit && settings.revisitButton) revisit.hidden = false;
 	}
 
