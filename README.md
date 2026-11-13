@@ -3,7 +3,7 @@
 GDPR-compliant cookie consent banner for WordPress with **Google Consent Mode v2**.
 Multilingual (Latvian / Russian / English / Lithuanian / Estonian), auto-detecting the visitor's language.
 
-- **Version:** 1.7.5
+- **Version:** 1.7.6
 - **Author:** [Coma](https://coma.lv)
 
 ## Features
