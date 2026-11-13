@@ -366,7 +366,7 @@ gtag('config', '<?php echo esc_js( $id ); ?>');
 					return $whole;
 				}
 				$attrs = $m[1];
-				$attrs = preg_replace( '#\bsrc\s*=#i', 'data-ccc-src=', $attrs );          // stop the fetch
+				$attrs = preg_replace( '#(?<![\w-])src\s*=#i', 'data-ccc-src=', $attrs ); // stop the fetch
 				$attrs = preg_replace( '#\btype\s*=\s*("[^"]*"|\'[^\']*\'|\S+)#i', '', $attrs ); // drop existing type
 				return '<script type="text/plain" data-ccc-block="' . esc_attr( $cat ) . '"' . $attrs . '>' . $m[2] . '</script>';
 			},
@@ -391,7 +391,7 @@ gtag('config', '<?php echo esc_js( $id ); ?>');
 				}
 				foreach ( $sigs as $sig ) {
 					if ( preg_match( '#' . $sig['re'] . '#i', $m[0] ) ) {
-						$attrs = preg_replace( '#\bsrc\s*=#i', 'data-ccc-src=', $m[1] );
+						$attrs = preg_replace( '#(?<![\w-])src\s*=#i', 'data-ccc-src=', $m[1] );
 						return '<iframe data-ccc-block="' . esc_attr( $sig['cat'] ) . '"' . $attrs . '>';
 					}
 				}

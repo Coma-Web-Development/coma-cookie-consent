@@ -255,7 +255,7 @@
 					if (entry.requires && !featureActive(entry.requires)) continue;
 					// Check if this DB entry's test matches the ensure testFn
 					// by testing the entry's canonical name against testFn
-					if (testFn(entry.name.replace('*', ''))) {
+					if (testFn(entry.name.replace(/\*/g, ''))) {
 						addEntry(entry, entry.name);
 						break;
 					}
@@ -354,6 +354,21 @@
 		return parts.length > 0;
 	}
 
+	// Only restore network URLs. Reject javascript:, data:, and other executable
+	// schemes that could be supplied through a DOM attribute.
+	function safeUrl(value, allowBlank) {
+		var raw = String(value || '').trim();
+		if (!raw) return '';
+		if (allowBlank && raw === 'about:blank') return raw;
+		try {
+			var url = new URL(raw, document.baseURI);
+			if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
+			return url.href;
+		} catch (e) {
+			return '';
+		}
+	}
+
 	function unblockScripts(consent) {
 		if (!settings.blockTrackers) return;
 		var nodes = document.querySelectorAll('script[type="text/plain"][data-ccc-block]');
@@ -361,12 +376,19 @@
 			var old = nodes[i];
 			if (!granted(consent, old.getAttribute('data-ccc-block'))) continue;
 			var s = document.createElement('script');
+			var invalidSrc = false;
 			for (var j = 0; j < old.attributes.length; j++) {
 				var a = old.attributes[j];
 				if (a.name === 'type' || a.name === 'data-ccc-block') continue;
-				if (a.name === 'data-ccc-src') { s.src = a.value; continue; }
+				if (a.name === 'data-ccc-src') {
+					var scriptSrc = safeUrl(a.value, false);
+					if (!scriptSrc) { invalidSrc = true; break; }
+					s.src = scriptSrc;
+					continue;
+				}
 				s.setAttribute(a.name, a.value);
 			}
+			if (invalidSrc) continue;
 			if (s.src) {
 				// Injected external scripts are async by default; keep document order
 				// unless the original tag asked for async itself.
@@ -380,7 +402,9 @@
 		for (var k = 0; k < frames.length; k++) {
 			var f = frames[k];
 			if (!granted(consent, f.getAttribute('data-ccc-block'))) continue;
-			f.setAttribute('src', f.getAttribute('data-ccc-src'));
+			var frameSrc = safeUrl(f.getAttribute('data-ccc-src'), true);
+			if (!frameSrc) continue;
+			f.setAttribute('src', frameSrc);
 			f.removeAttribute('data-ccc-src');
 			f.removeAttribute('data-ccc-block');
 		}
